@@ -58,6 +58,7 @@
     h += wrongIds.length ? '<div class="list">' + wrongIds.map(function (id) { var q = st.questionById(id); if (!q) return ""; return '<div class="it"><div class="t"><b>' + esc(q.text) + "</b><small>" + subjName(q.subjectId) + " · " + esc(chapName(q.chapterId)) + " · " + S.wrong[id].count + '회 오답</small></div><button class="btn sm sec" data-act="one" data-id="' + id + '">다시 풀기</button></div>'; }).join("") + "</div>" : empty("아직 오답이 없습니다.");
     h += "</div></div>";
     if (!o.solved) h += '<div class="card" style="margin-top:14px"><h2>처음이신가요?</h2><p class="sub">‘문제 풀이’에서 과목을 골라 시작해 보세요. 현재 포함된 문제는 모두 <b>테스트용 샘플</b>이며 실제 기출이 아닙니다. 마이페이지 → 문제 데이터 관리에서 직접 확인한 기출/자료를 CSV·JSON으로 등록할 수 있습니다.</p></div>';
+    if (window.__installEv && !(window.matchMedia && matchMedia("(display-mode: standalone)").matches)) h = '<div class="card" style="margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>📲 앱처럼 쓰기</b><div class="sub" style="margin:0">버튼 한 번이면 바탕화면·홈 화면에 아이콘이 생겨요.</div></div><button class="btn" data-act="install">앱 설치하기</button></div>' + h;
     $v.innerHTML = h;
   }
   function stat(k, v, s) { return '<div class="card stat"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="s">' + (s || "&nbsp;") + "</div></div>"; }
@@ -501,7 +502,7 @@
       if (/^[1-5]$/.test(e.key) && eq && +e.key <= eq.choices.length) A.pick({ n: e.key });
     }
   });
-  document.addEventListener("fe-installable", function () { if (location.hash === "#/me") vMe(); });
+  document.addEventListener("fe-installable", function () { if (location.hash === "#/me") vMe(); else if (location.hash === "#/home" || !location.hash) vHome(); });
   window.addEventListener("hashchange", route);
   window.addEventListener("beforeunload", function () { st.save(); });
   FE.app = { route: route, parseCSV: parseCSV, importText: importText };
