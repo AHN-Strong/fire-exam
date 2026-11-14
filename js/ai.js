@@ -5,16 +5,17 @@
  */
 FE.ai = (function () {
   var MODES = {
-    easy: "쉬운 말로 설명", terms: "법률·용어 풀이", choices: "선택지별 오답 분석",
+    mywrong: "내 오답 AI 해설", easy: "쉬운 말로 설명", terms: "법률·용어 풀이", choices: "선택지별 오답 분석",
     concept: "관련 개념 더 보기", similar: "유사 문제", generate: "유사 문제 생성", ask: "질문"
   };
-  function endpoint() { return (FE.store.S.settings.aiEndpoint || "").trim(); }
+  function endpoint() { return (FE.store.S.settings.aiEndpoint || (window.FE_CONFIG && FE_CONFIG.aiEndpoint) || "").trim(); }
   function enabled() { return !!endpoint(); }
 
-  function payload(q, mode, message) {
+  function payload(q, mode, message, sel) {
     var ch = FE.store.chapterById(q.chapterId), sj = FE.store.subjectById(q.subjectId);
     return {
       mode: mode, message: message || "",
+      selected: sel ? { number: sel, text: q.choices[sel - 1] } : null,
       question: {
         id: q.id, subject: sj && sj.name, chapter: ch && ch.name, year: q.year, type: q.type,
         text: q.text, choices: q.choices, answer: q.answer, explanation: q.explanation, why: q.why || [],
@@ -23,9 +24,14 @@ FE.ai = (function () {
     };
   }
 
-  function local(q, mode, message) {
+  function local(q, mode, message, sel) {
     var ch = FE.store.chapterById(q.chapterId), lines = [], gl = FE_SEED.glossary;
-    if (mode === "easy") {
+    if (mode === "mywrong") {
+      if (sel && sel !== q.answer) lines.push("**내가 고른 " + sel + "번 「" + q.choices[sel - 1] + "」**\n" + ((q.why || [])[sel - 1] || "이 선택지에 대한 등록된 해설이 없습니다."));
+      else if (sel === q.answer) lines.push("정답을 골랐습니다.");
+      lines.push("**정답 " + q.answer + "번 「" + q.choices[q.answer - 1] + "」**\n" + q.explanation);
+      lines.push("※ AI 연결 전이라 저장된 해설로 보여드립니다. AI를 연결하면 ‘왜 헷갈렸는지·암기 요령’까지 설명합니다.");
+    } else if (mode === "easy") {
       lines.push("**핵심 정리**\n" + q.explanation);
       lines.push("정답은 " + q.answer + "번 「" + q.choices[q.answer - 1] + "」 입니다.");
     } else if (mode === "terms") {
@@ -47,17 +53,17 @@ FE.ai = (function () {
     return { text: lines.join("\n\n"), source: "local", uncertain: false };
   }
 
-  function ask(q, mode, message) {
-    if (!enabled() || mode === "similar") return Promise.resolve(local(q, mode, message));
+  function ask(q, mode, message, sel) {
+    if (!enabled() || mode === "similar") return Promise.resolve(local(q, mode, message, sel));
     var ctrl = new AbortController(), t = setTimeout(function () { ctrl.abort(); }, 30000);
-    return fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload(q, mode, message)), signal: ctrl.signal })
+    return fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload(q, mode, message, sel)), signal: ctrl.signal })
       .then(function (r) { clearTimeout(t); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (j) {
         if (!j || !j.text) throw new Error("빈 응답");
         return { text: String(j.text), source: "llm", uncertain: !!j.uncertain };
       })
       .catch(function (e) {
-        var r = local(q, mode, message);
+        var r = local(q, mode, message, sel);
         r.text = "⚠ AI 서버에 연결하지 못해(" + e.message + ") 저장된 해설로 대신 표시합니다.\n\n" + r.text;
         return r;
       });

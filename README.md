@@ -28,5 +28,8 @@ https 주소로 올리면 Android(Chrome)·Windows(Chrome/Edge)에서 앱으로 
 - 앱 파일을 수정하면 `sw.js`의 `VERSION`을 올려야 사용자에게 갱신됩니다.
 - 학습 기록은 각자의 기기(브라우저)에 저장되어 친구와 섞이지 않습니다.
 
-## AI 연결 (선택)
-Vercel 배포 후 환경변수 `ANTHROPIC_API_KEY` 설정 → 마이페이지 AI 엔드포인트에 `/api/ai` 입력.
+## AI 해설 연결 (Claude)
+GitHub Pages는 서버가 없어 API 키를 안전하게 둘 수 없으므로, pi/ai.js를 Vercel에 별도 배포합니다.
+1. vercel.com에서 이 저장소를 Import (Framework: Other) → Environment Variables에 ANTHROPIC_API_KEY 추가
+2. 배포된 주소 + /api/ai 를 js/config.js의 iEndpoint에 입력 후 push
+3. Anthropic 콘솔에서 월 사용 한도를 설정하세요 (공개 앱이므로 필수)

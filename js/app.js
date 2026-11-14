@@ -85,7 +85,8 @@
     var mine = sel ? sel + "번 " + esc(q.choices[sel - 1] || "") : "선택하지 않음";
     var ok = sel === q.answer;
     return '<div class="mychoice ' + (ok ? "ok" : "ng") + '">내가 고른 답: <b>' + mine + "</b> " + (ok ? "⭕" : "❌") + " · 정답: <b>" + q.answer + "번</b></div>" +
-      qBody(q) + choiceBtns(q, sel || 0, true) + '<div style="margin-top:8px"><b>상세 해설</b>' + explBlock(q) + "</div>";
+      qBody(q) + choiceBtns(q, sel || 0, true) + '<div style="margin-top:8px"><b>상세 해설</b>' + explBlock(q) + "</div>" +
+      '<div style="margin-top:10px"><button class="btn sm" data-act="aiwrong" data-id="' + esc(q.id) + '" data-sel="' + (sel || 0) + '">🤖 AI 오답 해설</button><div class="aiwrap"></div></div>';
   }
   function qBody(q) {
     var h = '<div class="qtext">' + esc(q.text) + "</div>";
@@ -159,7 +160,7 @@
     var sim = st.similar(q, 3);
     h += '<div class="card" style="margin-bottom:12px"><h2>유사 문제 추천</h2>' + (sim.length ? '<div class="list">' + sim.map(function (x) { return '<div class="it"><div class="t"><b>' + esc(x.text) + "</b><small>" + esc(chapName(x.chapterId)) + '</small></div><button class="btn sm sec" data-act="one" data-id="' + x.id + '">풀기</button></div>'; }).join("") + "</div>" : empty("추천할 문제가 없습니다.")) + "</div>";
     h += '<div class="card"><h2>AI 해설 ' + (FE.ai.enabled() ? "" : '<span class="badge b-unverified">AI 미연결 · 저장된 해설 모드</span>') + '</h2><div class="chips">' +
-      ["easy", "terms", "choices", "concept", "generate"].map(function (m) { return '<button class="chip" data-act="ai" data-m="' + m + '">' + FE.ai.MODES[m] + "</button>"; }).join("") + '</div>' +
+      (a.ok ? [] : ["mywrong"]).concat(["easy", "terms", "choices", "concept", "generate"]).map(function (m) { return '<button class="chip" data-act="ai" data-m="' + m + '">' + FE.ai.MODES[m] + "</button>"; }).join("") + '</div>' +
       '<div class="row" style="margin-top:10px"><input type="text" id="ai-q" placeholder="이 문제에 대해 궁금한 점을 질문하세요" style="flex:1;min-width:200px"><button class="btn sm" data-act="ai" data-m="ask">질문</button></div><div id="ai-out"></div></div>';
     return h;
   }
@@ -415,11 +416,12 @@
   function download(name, text, mime) { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime || "text/plain" })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
   /* ---------- AI 패널 ---------- */
-  function runAI(mode) {
-    var q = curQ(); if (!q) return; var out = document.getElementById("ai-out"), msg = mode === "ask" ? val("ai-q").trim() : "";
+  function runAI(mode, q0, sel0, out0) {
+    var q = q0 || curQ(); if (!q) return; var out = out0 || document.getElementById("ai-out"), msg = mode === "ask" ? val("ai-q").trim() : "";
+    var sel = sel0 != null ? sel0 : ((S.session && S.session.ans[q.id]) || {}).sel;
     if (mode === "ask" && !msg) return toast("질문을 입력하세요");
     out.innerHTML = '<div class="aibox">불러오는 중…</div>';
-    FE.ai.ask(q, mode, msg).then(function (r) {
+    FE.ai.ask(q, mode, msg, sel).then(function (r) {
       out.innerHTML = '<div class="aibox">' + fmt(r.text) + '</div><p class="sub" style="margin:6px 0 0">' + (r.source === "llm" ? "AI 응답 — 제공된 문제 데이터 기준이며 법령 근거는 반드시 원문으로 확인하세요." + (r.uncertain ? " ⚠ 불확실한 내용이 포함되어 있습니다." : "") : "저장된 해설·개념 데이터 기반 응답입니다.") + "</p>";
     });
   }
@@ -443,6 +445,7 @@
     sendreport: function () { var q = curQ(), r = val("rp-r"), t = val("rp-t").trim(); st.addReport(q.id, r + (t ? " - " + t : "")); closeModal(); toast("신고가 접수되었습니다"); },
     closemodal: closeModal,
     install: function () { var ev = window.__installEv; if (!ev) return toast("브라우저 메뉴에서 ‘앱 설치’를 선택하세요"); ev.prompt(); ev.userChoice.then(function () { window.__installEv = null; if (location.hash === "#/me") vMe(); }); },
+    aiwrong: function (d, el) { var q = st.questionById(d.id); if (q) runAI("mywrong", q, +d.sel, el.nextElementSibling); },
     ai: function (d) { if (d.m === "similar") return; runAI(d.m); },
     startexam: startExam,
     goq: function (d) { S.examRun.idx = +d.i; st.save(); examRun(); }, gofirst: function (d) { closeModal(); S.examRun.idx = +d.i; st.save(); examRun(); },
@@ -472,8 +475,7 @@
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-act]"); if (!el) return;
     var fn = A[el.dataset.act]; if (!fn) return;
-    if (el.tagName === "A" && el.dataset.act === "quick") { fn(el.dataset); return; }
-    fn(el.dataset);
+    fn(el.dataset, el);
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
