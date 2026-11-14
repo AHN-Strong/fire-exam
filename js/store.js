@@ -64,6 +64,16 @@ FE.store = (function () {
     return base.slice().sort(function (a, b) { return b - a; });
   }
   function pastExams() { return window.FE_EXAMS || []; }
+  // 기출 해설(js/explain2025.js)을 문제 데이터에 병합
+  (function () {
+    var ex = window.FE_EXPL || {};
+    (window.FE_EXAMS || []).forEach(function (e) {
+      e.questions.forEach(function (q) {
+        var x = ex[q.id];
+        if (x) { q.explanation = x.exp; q.why = x.why; q.explConf = x.conf; q.explBy = "AI(Claude) 작성"; }
+      });
+    });
+  })();
   function seedQuestions() {
     var out = FE_SEED.questions.slice();
     pastExams().forEach(function (e) { out = out.concat(e.questions); });

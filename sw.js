@@ -1,7 +1,7 @@
 // 오프라인 지원: 앱 파일은 캐시 우선 + 백그라운드 갱신. 앱 파일을 수정하면 VERSION을 올리세요.
-const VERSION = "fire-exam-v1";
+const VERSION = "fire-exam-v2";
 const SHELL = ["./", "index.html", "styles.css", "manifest.webmanifest",
-  "js/seed.js", "js/exam2025.js", "js/store.js", "js/charts.js", "js/ai.js", "js/app.js",
+  "js/seed.js", "js/exam2025.js", "js/explain2025.js", "js/store.js", "js/charts.js", "js/ai.js", "js/app.js",
   "img/E2025-S1-22.png", "img/icon-192.png", "img/icon-512.png", "img/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {

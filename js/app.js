@@ -67,9 +67,25 @@
     return q.choices.map(function (c, i) {
       var n = i + 1, cls = "ch";
       if (answered) { if (n === q.answer) cls += " right"; else if (n === sel) cls += " wrong"; } else if (n === sel) cls += " sel";
-      return '<button class="' + cls + '" data-act="pick" data-n="' + n + '"' + (answered ? " disabled" : "") + '><span class="n">' + n + '</span><span>' + esc(c) +
-        (answered && q.why && q.why[i] ? '<span class="why">' + (n === q.answer ? "✔ 정답 · " : "✘ ") + esc(q.why[i]) + "</span>" : "") + "</span></button>";
+      var tags = "";
+      if (answered && n === sel) tags += '<span class="tag me">내 선택</span>';
+      if (answered && n === q.answer) tags += '<span class="tag ans">정답</span>';
+      var pre = q.type === "past" ? "" : (n === q.answer ? "✔ 정답 · " : "✘ ");
+      return '<button class="' + cls + '" data-act="pick" data-n="' + n + '"' + (answered ? " disabled" : "") + '><span class="n">' + n + '</span><span>' + tags + esc(c) +
+        (answered && q.why && q.why[i] ? '<span class="why">' + pre + esc(q.why[i]) + "</span>" : "") + "</span></button>";
     }).join("");
+  }
+  function explBlock(q) {
+    var h = '<div class="expl">' + esc(q.explanation) + "</div>";
+    if (q.explBy) h += '<p class="sub" style="margin:10px 0 0;font-size:12px">해설: ' + esc(q.explBy) + " · 법령 원문 대조 전" + (q.explConf === "check" ? ' · <b style="color:var(--warn)">세부 수치·조문 확인 필요</b>' : "") + "</p>";
+    return h;
+  }
+  /* 내가 고른 답 + 정답 + 선택지별 해설 + 상세 해설 (오답노트·시험결과 공용) */
+  function reviewHTML(q, sel) {
+    var mine = sel ? sel + "번 " + esc(q.choices[sel - 1] || "") : "선택하지 않음";
+    var ok = sel === q.answer;
+    return '<div class="mychoice ' + (ok ? "ok" : "ng") + '">내가 고른 답: <b>' + mine + "</b> " + (ok ? "⭕" : "❌") + " · 정답: <b>" + q.answer + "번</b></div>" +
+      qBody(q) + choiceBtns(q, sel || 0, true) + '<div style="margin-top:8px"><b>상세 해설</b>' + explBlock(q) + "</div>";
   }
   function qBody(q) {
     var h = '<div class="qtext">' + esc(q.text) + "</div>";
@@ -132,7 +148,7 @@
   }
   function feedback(q, a) {
     var h = '<div class="result ' + (a.ok ? "ok" : "ng") + '">' + (a.ok ? "⭕ 정답입니다!" : "❌ 오답입니다") + " · 정답: " + q.answer + "번 " + (a.ok ? "" : '<span style="font-weight:400">(내 선택: ' + a.sel + "번)</span>") + "</div>";
-    h += '<div class="card" style="margin-bottom:12px"><h2>상세 해설</h2><div class="expl">' + esc(q.explanation) + "</div>";
+    h += '<div class="card" style="margin-bottom:12px"><h2>상세 해설</h2>' + explBlock(q);
     h += '<p style="margin:12px 0 0;font-size:14px;color:var(--mut)">출제 단원: <b>' + subjName(q.subjectId) + " › " + esc(chapName(q.chapterId)) + "</b> · " + TYPE_LABEL[q.type] + (q.source && q.source.name ? " · 출처: " + esc(q.source.name) : "") + "</p>";
     if (q.type !== "past") h += '<p class="warn" style="margin-top:8px">이 문제는 실제 기출이 아닌 ' + TYPE_LABEL[q.type] + ' 문제입니다. 내용은 시험 전 교재·법령으로 재확인하세요.</p>';
     else if (q.answerStatus === "provisional") h += '<p class="warn" style="margin-top:8px">정답은 <b>가답안</b> 기준입니다. 최종 확정 답안은 소방청 공고로 확인하세요. 법령은 시험일(' + (q.year || "") + ') 시행 기준이라 현행과 다를 수 있습니다.</p>';
@@ -157,7 +173,7 @@
     var se = S.session, ids = se.ids, ans = se.ans, done = ids.filter(function (i) { return ans[i]; }), okN = done.filter(function (i) { return ans[i].ok; }).length;
     var wrong = done.filter(function (i) { return !ans[i].ok; });
     var h = '<div class="qwrap"><h1>풀이 결과</h1><div class="grid g3"><div class="card stat"><div class="k">푼 문제</div><div class="v">' + done.length + " / " + ids.length + '</div></div><div class="card stat"><div class="k">정답</div><div class="v">' + okN + '</div></div><div class="card stat"><div class="k">정답률</div><div class="v">' + pct(st.pct(okN, done.length)) + "</div></div></div>";
-    h += '<div class="card" style="margin-top:14px"><h2>틀린 문제 (' + wrong.length + ')</h2>' + (wrong.length ? '<div class="list">' + wrong.map(function (id) { var q = st.questionById(id); return '<div class="it"><div class="t"><b>' + esc(q.text) + "</b><small>" + esc(chapName(q.chapterId)) + " · 정답 " + q.answer + "번</small></div></div>"; }).join("") + "</div>" : empty("틀린 문제가 없습니다. 훌륭해요! 🎉")) + "</div>";
+    h += '<div class="card" style="margin-top:14px"><h2>틀린 문제 (' + wrong.length + ')</h2>' + (wrong.length ? '<div class="list">' + wrong.map(function (id) { var q = st.questionById(id); return '<div class="itw"><div class="it"><div class="t"><b>' + esc(q.text) + "</b><small>" + esc(chapName(q.chapterId)) + " · 내 선택 " + ans[id].sel + "번 / 정답 " + q.answer + '번</small></div></div><details class="rv"><summary>내가 고른 답·해설 보기</summary>' + reviewHTML(q, ans[id].sel) + "</details></div>"; }).join("") + "</div>" : empty("틀린 문제가 없습니다. 훌륭해요! 🎉")) + "</div>";
     h += '<div class="row" style="margin-top:14px">' + (wrong.length ? '<button class="btn" data-act="retrywrong">틀린 문제 다시 풀기</button>' : "") + '<button class="btn sec" data-act="newsession">새로 시작</button></div></div>';
     $v.innerHTML = h;
   }
@@ -260,7 +276,7 @@
     if (e.provisional) h += '<p class="warn" style="margin-top:14px">이 시험의 정답은 <b>가답안</b> 기준입니다. 이의제기로 최종 확정 답안이 달라졌을 수 있으니 소방청 확정 답안을 확인하세요.</p>';
     h += '<div class="card" style="margin-top:14px"><h2>틀린 문제 (' + e.wrongIds.length + ")</h2>" + (e.wrongIds.length ? e.wrongIds.map(function (qid) {
       var q = st.questionById(qid); if (!q) return ""; var sel = e.answers[qid];
-      return "<details style=\"border-bottom:1px solid var(--line);padding:8px 0\"><summary><b>" + esc(q.text) + '</b> <small style="color:var(--mut)">(' + esc(chapName(q.chapterId)) + ")</small></summary><div style=\"padding:8px 0\">내 답: " + (sel ? sel + "번" : "미선택") + " · <b>정답: " + q.answer + "번 " + esc(q.choices[q.answer - 1]) + "</b><div class=\"expl\" style=\"margin-top:6px\">" + esc(q.explanation) + "</div></div></details>";
+      return "<details style=\"border-bottom:1px solid var(--line);padding:8px 0\"><summary><b>" + esc(q.text) + '</b> <small style="color:var(--mut)">(' + esc(chapName(q.chapterId)) + " · 내 답 " + (sel ? sel + "번" : "미선택") + " / 정답 " + q.answer + "번)</small></summary><div style=\"padding:8px 0\">" + reviewHTML(q, sel) + "</div></details>";
     }).join("") : empty("모두 정답!")) + "</div>";
     h += '<div class="row" style="margin-top:14px">' + (e.wrongIds.length ? '<button class="btn" data-act="reviewexam" data-id="' + e.id + '">틀린 문제 다시 풀기</button>' : "") + '<a class="btn sec" href="#/exam">모의고사 홈</a></div>';
     $v.innerHTML = h;
@@ -284,7 +300,9 @@
     h += '<div class="row" style="margin-top:14px"><button class="btn" data-act="wrongpractice"' + (ids.length ? "" : " disabled") + '>이 목록 전체 풀기 (' + ids.length + ')</button><button class="btn sec" data-act="wrongexam"' + (total ? "" : " disabled") + ">오답 모의고사</button></div></div>";
     h += '<div class="card" style="margin-top:14px">' + (ids.length ? '<div class="list">' + ids.map(function (id) {
       var q = st.questionById(id), w = S.wrong[id], a = att[id] || { n: 0, c: 0 };
-      return '<div class="it"><div class="t"><b>' + esc(q.text) + "</b><small>" + subjName(q.subjectId) + " › " + esc(chapName(q.chapterId)) + " · 틀린 횟수 " + w.count + "회 · 정답률 " + pct(st.pct(a.c, a.n)) + ' · 숙련도 <span class="mast">' + [1, 2, 3, 4, 5].map(function (i) { return '<i class="' + (i <= w.mastery ? "on" : "") + '"></i>'; }).join("") + "</span>" + (w.mastery >= 3 ? " <b style=\"color:var(--ok)\">숙련</b>" : "") + '</small></div><button class="btn sm sec" data-act="one" data-id="' + id + '">다시 풀기</button><button class="btn sm dng" data-act="delwrong" data-id="' + id + '">삭제</button></div>';
+      var mine = S.attempts.filter(function (x) { return x.qid === id; }), lastWrong = mine.filter(function (x) { return !x.ok; }).pop(), picks = mine.filter(function (x) { return !x.ok; }).map(function (x) { return x.sel ? x.sel + "번" : "미선택"; });
+      var review = '<details class="rv"><summary>내가 고른 답·해설 보기' + (picks.length ? " (틀렸을 때 선택: " + picks.slice(-3).join(", ") + ")" : "") + "</summary>" + reviewHTML(q, lastWrong ? lastWrong.sel : 0) + "</details>";
+      return '<div class="itw"><div class="it"><div class="t"><b>' + esc(q.text) + "</b><small>" + subjName(q.subjectId) + " › " + esc(chapName(q.chapterId)) + " · 틀린 횟수 " + w.count + "회 · 정답률 " + pct(st.pct(a.c, a.n)) + ' · 숙련도 <span class="mast">' + [1, 2, 3, 4, 5].map(function (i) { return '<i class="' + (i <= w.mastery ? "on" : "") + '"></i>'; }).join("") + "</span>" + (w.mastery >= 3 ? " <b style=\"color:var(--ok)\">숙련</b>" : "") + '</small></div><button class="btn sm sec" data-act="one" data-id="' + id + '">다시 풀기</button><button class="btn sm dng" data-act="delwrong" data-id="' + id + '">삭제</button></div>' + review + "</div>";
     }).join("") + "</div>" : empty(total ? "조건에 맞는 오답이 없습니다." : "저장된 오답이 없습니다. 문제를 풀다 틀리면 자동으로 쌓입니다.")) + "</div>";
     $v.innerHTML = h;
   }
